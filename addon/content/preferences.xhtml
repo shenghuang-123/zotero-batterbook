@@ -1,0 +1,99 @@
+<linkset>
+  <html:link rel="localization" href="__addonRef__-preferences.ftl" />
+</linkset>
+<groupbox>
+  <label><html:h2 data-l10n-id="pref-title"></html:h2></label>
+  <checkbox
+    id="zotero-prefpane-__addonRef__-enable-grid-view"
+    preference="enableGridView"
+    data-l10n-id="pref-enable-grid-view"
+  />
+  <html:div class="cover-view-tile-size-setting">
+    <html:label
+      for="zotero-prefpane-__addonRef__-tile-size"
+      data-l10n-id="pref-tile-size"
+    ></html:label>
+    <html:div class="cover-view-tile-size-control">
+      <html:input
+        id="zotero-prefpane-__addonRef__-tile-size"
+        type="range"
+        min="90"
+        max="360"
+        step="9"
+        preference="tileSize"
+      />
+      <html:div class="cover-view-tile-size-marks" aria-hidden="true">
+        <html:span style="left: 0%">50%</html:span>
+        <html:span style="left: 33.333%">100%</html:span>
+        <html:span style="left: 66.667%">150%</html:span>
+        <html:span style="left: 100%">200%</html:span>
+      </html:div>
+    </html:div>
+    <html:input
+      id="zotero-prefpane-__addonRef__-tile-size-percent"
+      class="cover-view-tile-size-percent"
+      type="number"
+      min="50"
+      max="200"
+      step="5"
+      data-l10n-id="pref-tile-size-percent"
+    />
+    <html:span aria-hidden="true">%</html:span>
+  </html:div>
+</groupbox>
+<groupbox>
+  <label><html:h2 data-l10n-id="pref-tile-appearance"></html:h2></label>
+  <checkbox
+    id="zotero-prefpane-__addonRef__-show-titles"
+    preference="showTitles"
+    data-l10n-id="pref-show-titles"
+  />
+  <checkbox
+    id="zotero-prefpane-__addonRef__-show-creators"
+    preference="showCreators"
+    data-l10n-id="pref-show-creators"
+  />
+  <checkbox
+    id="zotero-prefpane-__addonRef__-show-years"
+    preference="showYears"
+    data-l10n-id="pref-show-years"
+  />
+  <checkbox
+    id="zotero-prefpane-__addonRef__-show-item-type-icon"
+    preference="showItemTypeIcon"
+    data-l10n-id="pref-show-item-type-icon"
+  />
+  <checkbox
+    id="zotero-prefpane-__addonRef__-desaturate-online-covers"
+    preference="desaturateOnlineCovers"
+    data-l10n-id="pref-desaturate-online-covers"
+  />
+</groupbox>
+<groupbox>
+  <label><html:h2 data-l10n-id="pref-cover-sources"></html:h2></label>
+  <checkbox
+    id="zotero-prefpane-__addonRef__-fetch-isbn-cover"
+    preference="fetchISBNCover"
+    data-l10n-id="pref-fetch-isbn-cover"
+  />
+  <checkbox
+    id="zotero-prefpane-__addonRef__-fetch-metadata-cover"
+    preference="fetchMetadataCover"
+    data-l10n-id="pref-fetch-metadata-cover"
+  />
+</groupbox>
+<vbox style="margin-top: 24px">
+  <html:hr
+    style="
+      width: 100%;
+      margin: 0 0 10px;
+      border: 0;
+      border-top: 1px solid currentColor;
+      opacity: 0.2;
+    "
+  />
+  <html:label
+    data-l10n-id="pref-help"
+    data-l10n-args='{"time": "__buildTime__","name": "__addonName__","version":"__buildVersion__"}'
+  ></html:label>
+</vbox>

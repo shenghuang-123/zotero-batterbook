@@ -1,0 +1,25 @@
+# dot files
+.DS_Store
+
+# Node.js
+node_modules
+pnpm-lock.yaml
+yarn.lock
+
+# TSC
+tsconfig.tsbuildinfo
+
+# Scaffold
+.env
+.scaffold
+build
+logs
+
+# Agents
+AGENTS.md
+CONTEXT.md
+.opencode
+.agents
+skills-lock.json
+docs
+.scratch
