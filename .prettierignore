@@ -2,6 +2,7 @@
 build
 logs
 node_modules
+.qoder-credits
 package-lock.json
 yarn.lock
 pnpm-lock.yaml

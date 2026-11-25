@@ -2,6 +2,7 @@ import { config } from "../package.json";
 import hooks from "./hooks";
 import { createZToolkit } from "./utils/ztoolkit";
 import { endGridResizeGesture, gridViewSettled } from "./modules/gridView";
+import { BookFilePicker, setBookFilePickerFactory } from "./modules/bookImport";
 
 class Addon {
   public data: {
@@ -28,6 +29,8 @@ class Addon {
      * effect while the grid is hidden, which restores its last visible anchor.
      */
     endResizeGesture: (win: Window): void => endGridResizeGesture(win),
+    setFilePicker: (factory?: () => BookFilePicker): void =>
+      setBookFilePickerFactory(factory),
   };
 
   constructor() {

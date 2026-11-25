@@ -13,7 +13,7 @@ let cleanupScheduled = false;
 const cacheDirectory = (): string =>
   PathUtils.join(
     Zotero.DataDirectory.dir,
-    "coverview",
+    "zetara",
     "covers",
     "open-library",
     "olid",

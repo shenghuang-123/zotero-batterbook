@@ -21,7 +21,7 @@ describe("test environment", function () {
     it("lives in a project-named run directory under the OS temp directory", async function () {
       const directory = await scratchDirectory();
       assert.equal(PathUtils.parent(runDirectory()), PathUtils.tempDir);
-      assert.match(PathUtils.filename(runDirectory()), /^zotero-cover-view-/);
+      assert.match(PathUtils.filename(runDirectory()), /^zotero-zetara-/);
       assert.equal(PathUtils.parent(directory), runDirectory());
       assert.notEqual(directory, await scratchDirectory());
       assert.isEmpty(await IOUtils.getChildren(directory));

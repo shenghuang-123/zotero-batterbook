@@ -15,6 +15,13 @@ tsconfig.tsbuildinfo
 build
 logs
 
+# Local test entry directories
+test-entries
+test-import-entries
+
+# Qoder artifacts
+.qoder-credits
+
 # Agents
 AGENTS.md
 CONTEXT.md

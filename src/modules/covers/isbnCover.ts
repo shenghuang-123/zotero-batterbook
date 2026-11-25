@@ -8,12 +8,7 @@ type RequestCover = typeof scheduleOpenLibraryRequest;
 const inFlight = new Map<string, Promise<string | null>>();
 
 const cacheDirectory = (): string =>
-  PathUtils.join(
-    Zotero.DataDirectory.dir,
-    "coverview",
-    "covers",
-    "open-library",
-  );
+  PathUtils.join(Zotero.DataDirectory.dir, "zetara", "covers", "open-library");
 
 const imagePath = (isbn: string): string =>
   PathUtils.join(cacheDirectory(), `${isbn}.jpg`);

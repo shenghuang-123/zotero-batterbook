@@ -5,6 +5,7 @@ import {
   getPref,
   GridWindow,
   ItemSpec,
+  localized,
   openGrid,
   setPref,
 } from "./helpers/gridFixture";
@@ -86,7 +87,10 @@ describe("tile captions", function () {
             [TITLE, metadata(prefs)].filter(Boolean).join(" · "),
             label,
           );
-          assert.equal(grid.coverImage(item).alt, `Cover for ${TITLE}`);
+          assert.equal(
+            grid.coverImage(item).alt,
+            localized("cover-view-image-alt", { args: { title: TITLE } }),
+          );
         }
   });
 

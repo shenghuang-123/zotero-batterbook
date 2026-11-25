@@ -9,11 +9,8 @@ export default defineConfig({
   name: pkg.config.addonName,
   id: pkg.config.addonID,
   namespace: pkg.config.addonRef,
-  updateURL: `https://github.com/{{owner}}/{{repo}}/releases/download/release/${
-    pkg.version.includes("-") ? "update-beta.json" : "update.json"
-  }`,
-  xpiDownloadLink:
-    "https://github.com/{{owner}}/{{repo}}/releases/download/v{{version}}/{{xpiName}}.xpi",
+  updateURL: "https://invalid.example/zetara-update.json",
+  xpiDownloadLink: "",
 
   build: {
     assets: ["addon/**/*.*"],
@@ -21,7 +18,7 @@ export default defineConfig({
       ...pkg.config,
       author: pkg.author,
       description: pkg.description,
-      homepage: pkg.homepage,
+      homepage: "",
       buildVersion: pkg.version,
       buildTime: "{{buildTime}}",
     },
@@ -48,12 +45,13 @@ export default defineConfig({
   },
 
   test: {
-    entries: process.env.COVER_VIEW_TEST_ENTRIES || "test",
+    entries: process.env.ZETARA_TEST_ENTRIES || "test",
     waitForPlugin: `() => Zotero.${pkg.config.addonInstance}.data.initialized`,
   },
 
   release: {
     github: {
+      repository: "",
       releaseNote: (ctx) =>
         releaseNotes(
           readFileSync("CHANGELOG.md", "utf8"),

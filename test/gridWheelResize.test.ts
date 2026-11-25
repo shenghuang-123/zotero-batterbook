@@ -1,4 +1,5 @@
 import { assert } from "chai";
+import { config } from "../package.json";
 import {
   getPref,
   GridFixture,
@@ -263,7 +264,7 @@ describe("wheel resizing", function () {
     const grid = await fixedGrid();
     const prefs = await openPreferences();
     const slider = prefs.document.getElementById(
-      "zotero-prefpane-coverview-tile-size",
+      `zotero-prefpane-${config.addonRef}-tile-size`,
     ) as HTMLInputElement;
     const size = getPref("tileSize");
     await until(

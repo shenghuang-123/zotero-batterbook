@@ -7,7 +7,7 @@
  * global and its hooks are registered once for the whole run.
  */
 
-const PROJECT = "zotero-cover-view-tests";
+const PROJECT = "zotero-zetara-tests";
 
 export interface OpenLibraryReply {
   status?: number;
@@ -470,7 +470,7 @@ export function uniqueEditionKey(): string {
 function onlineCoverCache(): string {
   return PathUtils.join(
     Zotero.DataDirectory.dir,
-    "coverview",
+    "zetara",
     "covers",
     "open-library",
   );

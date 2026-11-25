@@ -8,6 +8,12 @@ import {
 import { GridWindowUI } from "./gridWindowUI";
 import { ItemTreeBridge } from "./itemTreeBridge";
 import { CoverProvider } from "./coverProvider";
+import {
+  importBookPerFile,
+  isBookFilePath,
+  pickAndImportBooks,
+  reportBookImportError,
+} from "./bookImport";
 import { getPref, observePrefs, setPref } from "../utils/prefs";
 
 const gridViews = new Map<Window, GridView>();
@@ -56,7 +62,11 @@ export class GridView {
 
   constructor(private readonly win: _ZoteroTypes.MainWindow) {
     this.tree = new ItemTreeBridge(win);
-    this.ui = new GridWindowUI(win, this.toggleEnabled);
+    this.ui = new GridWindowUI(
+      win,
+      this.toggleEnabled,
+      () => void pickAndImportBooks(win),
+    );
     this.renderer = new GridRenderer(
       this.ui.host,
       this.selectClickedItem,
@@ -141,6 +151,7 @@ export class GridView {
         ? "tree"
         : this.focusOwner;
     const enteringGrid = enabled && !!this.ui.host.hidden;
+    if (enteringGrid) this.closeOverlappingGallery();
     this.cancelSync();
     if (this.focusFrame !== undefined) {
       this.win.cancelAnimationFrame(this.focusFrame);
@@ -186,8 +197,27 @@ export class GridView {
   }
 
   readonly toggleEnabled = (): void => {
+    // Ethereal Style's gallery is an absolutely positioned overlay in the same
+    // items pane. Bring the bookshelf to the front by closing it first.
+    if (this.closeOverlappingGallery()) {
+      if (!getPref("enableGridView")) setPref("enableGridView", true);
+      else this.applyEnabledPreference();
+      return;
+    }
     setPref("enableGridView", !getPref("enableGridView"));
   };
+
+  private closeOverlappingGallery(): boolean {
+    const gallery = this.win.document.getElementById(
+      "zotero-style-gallery-view",
+    );
+    if (!gallery || gallery.getAttribute("aria-pressed") !== "true")
+      return false;
+    gallery.dispatchEvent(
+      new this.win.Event("command", { bubbles: true, cancelable: true }),
+    );
+    return true;
+  }
 
   applyTileSizePreference(): void {
     const size = getPref("tileSize");
@@ -529,6 +559,7 @@ export class GridView {
     if (tile && (hoverItems || hoverFiles)) {
       tile.classList.add("drop-target");
     }
+    if (hoverFiles && !tile) this.ui.host.classList.add("file-drop-target");
     if (!hoverItems && !hoverFiles) {
       // Cancel even rejected hover events so Gecko applies the prohibit effect.
       event.preventDefault();
@@ -585,6 +616,30 @@ export class GridView {
       return;
     }
     if (tile && !this.tree.canDropFiles(event.dataTransfer, itemID)) return;
+    const transfer = event.dataTransfer;
+    const bookPaths =
+      !tile &&
+      transfer &&
+      !event.shiftKey &&
+      !event.ctrlKey &&
+      !event.metaKey &&
+      !event.altKey
+        ? this.tree.getDroppedFilePaths(transfer)
+        : [];
+    if (
+      bookPaths.length &&
+      bookPaths.every(isBookFilePath) &&
+      this.tree.canDropFiles(transfer, undefined)
+    ) {
+      event.preventDefault();
+      event.stopPropagation();
+      if (transfer) transfer.dropEffect = "copy";
+      void importBookPerFile(this.win, bookPaths).catch((error) => {
+        ztoolkit.log("Failed to import dropped books", error);
+        reportBookImportError(this.win, error);
+      });
+      return;
+    }
     event.preventDefault();
     event.stopPropagation();
     void this.tree.dropFiles(event, itemID).catch((error) => {
@@ -595,6 +650,7 @@ export class GridView {
   private readonly clearDropTile = (): void => {
     for (const tile of this.ui.host.querySelectorAll(".drop-target"))
       tile.classList.remove("drop-target");
+    this.ui.host.classList.remove("file-drop-target");
   };
 
   private readonly resetDrop = (): void => {

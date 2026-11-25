@@ -1,4 +1,5 @@
 import { assert } from "chai";
+import { config } from "../package.json";
 import { attachTileSizePreference } from "../src/modules/tileSizePreference";
 import {
   getPref,
@@ -10,7 +11,7 @@ import {
   until,
 } from "./helpers/gridFixture";
 
-const SLIDER_ID = "zotero-prefpane-coverview-tile-size";
+const SLIDER_ID = `zotero-prefpane-${config.addonRef}-tile-size`;
 const PERCENT_ID = `${SLIDER_ID}-percent`;
 
 /** A grid of fixed size, so that the largest tiles fit its width. */

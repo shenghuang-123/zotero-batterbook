@@ -16,6 +16,10 @@ import {
   registerItemPaneCover,
   unregisterItemPaneCover,
 } from "./modules/itemPaneCover";
+import {
+  registerBookFilesPane,
+  unregisterBookFilesPane,
+} from "./modules/bookFilesPane";
 
 async function onStartup() {
   await Promise.all([
@@ -29,6 +33,7 @@ async function onStartup() {
   registerPreferences();
   CoverProvider.registerNotifier();
   registerItemPaneCover();
+  registerBookFilesPane();
 
   await registerCoverColumn();
 
@@ -52,6 +57,7 @@ function onMainWindowUnload(win: Window): void {
 function onShutdown(): void {
   unregisterCoverColumn();
   unregisterItemPaneCover();
+  unregisterBookFilesPane();
   destroyGridViews();
   CoverProvider.unregisterNotifier();
   CoverProvider.clearCache();

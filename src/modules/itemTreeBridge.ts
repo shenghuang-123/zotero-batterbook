@@ -160,6 +160,32 @@ export class ItemTreeBridge {
     }
   }
 
+  /** Paths of the files an external drag offers, now that they are exposed. */
+  getDroppedFilePaths(transfer: DataTransfer | null): string[] {
+    if (!transfer?.mozItemCount) return [];
+    const paths: string[] = [];
+    try {
+      for (let index = 0; index < transfer.mozItemCount; index++) {
+        const entry = transfer.mozGetDataAt(
+          "application/x-moz-file",
+          index,
+        ) as {
+          QueryInterface?: (iface: typeof Ci.nsIFile) => {
+            path?: string;
+            isFile?: () => boolean;
+          };
+          path?: string;
+          isFile?: () => boolean;
+        } | null;
+        const file = entry?.QueryInterface?.(Ci.nsIFile) ?? entry;
+        if (file?.path && file.isFile?.()) paths.push(file.path);
+      }
+    } catch {
+      return [];
+    }
+    return paths;
+  }
+
   canDropFiles(transfer: DataTransfer | null, itemID?: number): boolean {
     if (!transfer || !this.canHoverFiles(transfer, itemID)) return false;
     try {

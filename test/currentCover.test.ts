@@ -305,7 +305,11 @@ describe("current cover", function () {
 
       await restore();
       await Zotero.Notifier.trigger("download", "file", attachment.id);
-      assert.include(changes, item.id, "the cover change is announced");
+      await until(
+        () => changes.includes(item.id),
+        "the cover change to be announced",
+        { observe: () => changes },
+      );
       await assertCover(await displayedCover(item), "attachment", TALL);
     });
 
@@ -316,7 +320,11 @@ describe("current cover", function () {
 
       await restore();
       await Zotero.Notifier.trigger("download", "file", attachment.id);
-      assert.include(changes, attachment.id, "the cover change is announced");
+      await until(
+        () => changes.includes(attachment.id),
+        "the cover change to be announced",
+        { observe: () => changes },
+      );
       await assertCover(await displayedCover(attachment), "attachment", TALL);
     });
   });

@@ -1,11 +1,15 @@
+#zetara-add-book {
+  list-style-image: url("chrome://zetara/content/icons/add-book.svg");
+}
+
 #cover-view-toggle {
-  list-style-image: url("chrome://coverview/content/icons/grid-view.svg");
+  list-style-image: url("chrome://zetara/content/icons/bookshelf.svg");
   fill: currentColor;
   -moz-context-properties: fill, fill-opacity;
 }
 
 #cover-view-toggle[checked] {
-  list-style-image: url("chrome://coverview/content/icons/list-view.svg");
+  list-style-image: url("chrome://zetara/content/icons/list-view.svg");
 }
 
 #cover-view-grid {
@@ -24,7 +28,9 @@
   min-width: 0;
   min-height: 0;
   padding: 24px;
-  overflow: auto;
+  /* The fan never scrolls sideways; clip it rather than grow a scrollbar. */
+  overflow-x: clip;
+  overflow-y: auto;
 }
 
 #cover-view-grid:not([hidden]) {
@@ -35,7 +41,14 @@
   display: none;
 }
 
+#cover-view-grid.file-drop-target {
+  outline: 2px dashed color-mix(in srgb, #806cc9 70%, transparent);
+  outline-offset: -10px;
+  background-color: color-mix(in srgb, #806cc9 5%, transparent);
+}
+
 .grid-view-item {
+  z-index: 0;
   min-width: 0;
   width: min(100%, var(--cover-view-tile-size));
   justify-self: center;
@@ -72,6 +85,7 @@
 
 .grid-view-cover {
   position: relative;
+  z-index: 10;
   display: flex;
   aspect-ratio: 210 / 297;
   align-items: center;
@@ -97,6 +111,107 @@
   background: var(--material-background, Canvas);
   color: CanvasText;
   box-shadow: 0 1px 3px color-mix(in srgb, black 25%, transparent);
+}
+
+.grid-view-stack {
+  position: relative;
+}
+
+.grid-view-fan {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.grid-view-fan-card,
+.grid-view-fan-more {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  border: 1px solid color-mix(in srgb, currentColor 14%, transparent);
+  border-radius: 6px;
+  background: var(--material-background, Canvas);
+  color: CanvasText;
+  box-shadow: 0 2px 8px color-mix(in srgb, black 16%, transparent);
+  opacity: 0;
+  pointer-events: none;
+  transform: translateX(0) rotate(0deg) scale(0.96);
+  transform-origin: 50% 100%;
+  transition:
+    transform 320ms cubic-bezier(0.2, 0.7, 0.3, 1),
+    opacity 200ms ease;
+}
+
+.grid-view-fan-card {
+  overflow: hidden;
+}
+
+.grid-view-fan-card img {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.grid-view-fan-card img[hidden] {
+  display: none;
+}
+
+.grid-view-fan-icon {
+  width: 28px;
+  height: 28px;
+  opacity: 0.55;
+}
+
+.grid-view-fan-more {
+  color: GrayText;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.grid-view-item.has-attachments.is-fanned {
+  z-index: 3;
+}
+
+.grid-view-item.has-attachments .grid-view-cover {
+  transition: transform 320ms cubic-bezier(0.2, 0.7, 0.3, 1);
+}
+
+.grid-view-item.has-attachments.is-fanned .grid-view-cover {
+  /* Lean away from the side the fan opens on. */
+  transform: translateX(calc(var(--fan-direction, 1) * -5%))
+    rotate(calc(var(--fan-direction, 1) * -8deg)) scale(1.05);
+  transform-origin: 50% 100%;
+}
+
+.grid-view-item.has-attachments.is-fanned .grid-view-fan-card,
+.grid-view-item.has-attachments.is-fanned .grid-view-fan-more {
+  opacity: 1;
+  transform: translateX(
+      calc(
+        var(--fan-direction, 1) * (var(--fan-index) + 1) * var(--fan-step, 85%)
+      )
+    )
+    rotate(calc(var(--fan-direction, 1) * (3deg + var(--fan-index) * 6deg)))
+    scale(0.96);
+}
+
+.grid-view-item.has-attachments.is-fanned .grid-view-fan-card {
+  pointer-events: auto;
+  z-index: calc(var(--fan-index) + 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .grid-view-fan-card,
+  .grid-view-fan-more,
+  .grid-view-item.has-attachments .grid-view-cover {
+    transition: none;
+  }
 }
 
 .grid-view-cover img {
@@ -258,4 +373,68 @@
 .grid-view-separator {
   flex: none;
   white-space: pre;
+}
+
+.zetara-book-files {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px;
+}
+
+.zetara-book-files-empty {
+  color: GrayText;
+  padding: 4px;
+}
+
+.zetara-book-files-empty[hidden] {
+  display: none;
+}
+
+.zetara-book-file-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.zetara-book-file {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  padding: 8px;
+  border: 1px solid color-mix(in srgb, currentColor 16%, transparent);
+  border-radius: 6px;
+}
+
+.zetara-book-file-details {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.zetara-book-file-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.zetara-book-file-meta {
+  margin-top: 2px;
+  color: GrayText;
+  font-size: 11px;
+}
+
+.zetara-book-file-actions {
+  display: flex;
+  flex: none;
+  gap: 4px;
+}
+
+.zetara-book-file-actions button {
+  min-height: 24px;
+  padding: 2px 8px;
+}
+
+.zetara-book-file-actions button:disabled {
+  opacity: 0.5;
 }

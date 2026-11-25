@@ -206,6 +206,58 @@ function plugin(): Plugin {
   return (Zotero as unknown as Record<string, Plugin>)[config.addonInstance];
 }
 
+interface FluentPattern {
+  value: string | null;
+  attributes?: { name: string; value: string }[] | null;
+}
+
+/**
+ * A string from the live plugin's Fluent bundle, exactly as the UI shows it
+ * under the active application locale.
+ */
+export function localized(
+  id: import("../../typings/i10n").FluentMessageId,
+  {
+    attribute,
+    args,
+  }: { attribute?: string; args?: Record<string, unknown> } = {},
+): string {
+  const locale = plugin().data.locale?.current as
+    | {
+        formatMessagesSync(
+          messages: { id: string; args?: Record<string, unknown> }[],
+        ): FluentPattern[];
+      }
+    | undefined;
+  if (!locale) throw new Error("The plugin's locale is not initialized");
+  const pattern = locale.formatMessagesSync([
+    { id: `${config.addonRef}-${id}`, args },
+  ])[0];
+  if (!pattern) throw new Error(`The plugin has no Fluent message ${id}`);
+  if (!attribute) return pattern.value ?? "";
+  return (
+    pattern.attributes?.find((entry) => entry.name === attribute)?.value ?? ""
+  );
+}
+
+/** Supply the live plugin's native file-picker seam for one test. */
+export function selectBookFiles(paths: string[] | null): { opened: boolean } {
+  const selection = { opened: false };
+  plugin().testing.setFilePicker(() => ({
+    modeOpenMultiple: 3,
+    returnOK: 0,
+    files: paths ?? [],
+    init() {},
+    appendFilter() {},
+    async show() {
+      selection.opened = true;
+      return paths === null ? 1 : 0;
+    },
+  }));
+  onTeardown(() => plugin().testing.setFilePicker());
+  return selection;
+}
+
 function mainWindow(): _ZoteroTypes.MainWindow {
   const win = Zotero.getMainWindow();
   if (!win) throw new Error("The Zotero main window is not open");
@@ -666,6 +718,13 @@ export interface ItemTypeBadge {
   onCover: boolean;
 }
 
+/** The book files fanned out behind a book cover. */
+export interface AttachmentFan {
+  cards: { title: string; icon: string; cover: string | null }[];
+  /** Further files summarized by a +N card. */
+  more: number;
+}
+
 interface Box {
   top: number;
   bottom: number;
@@ -781,7 +840,7 @@ export abstract class GridViewport {
 
   /** The cover shown on the tile for `item`, if any. */
   currentCover(item: ItemRef): { kind: CoverKind; uri: string } | undefined {
-    const image = this.tile(item).querySelector("img");
+    const image = this.tile(item).querySelector(".grid-view-cover img");
     const uri = image?.getAttribute("src");
     if (!image || image.hidden || !uri) return undefined;
     return { kind: image.dataset.coverSource as CoverKind, uri };
@@ -789,7 +848,9 @@ export abstract class GridViewport {
 
   /** The cover image element of the tile for `item`. */
   coverImage(item: ItemRef): HTMLImageElement {
-    return this.tile(item).querySelector("img")!;
+    return this.tile(item).querySelector<HTMLImageElement>(
+      ".grid-view-cover img",
+    )!;
   }
 
   /**
@@ -919,6 +980,38 @@ export abstract class GridViewport {
         bounds.top >= cover.top &&
         bounds.bottom <= cover.bottom,
     };
+  }
+
+  /** The book files fanned out behind the cover of the tile for `item`. */
+  attachmentFan(item: ItemRef): AttachmentFan | undefined {
+    const tile = this.tile(item);
+    const cards = Array.from(
+      tile.querySelectorAll<HTMLElement>(".grid-view-fan-card"),
+    );
+    if (!cards.length) return undefined;
+    const win = this.grid.ownerDocument.defaultView!;
+    return {
+      cards: cards.map((card) => ({
+        title: card.title,
+        icon: win.getComputedStyle(card.querySelector(".grid-view-fan-icon")!)
+          .backgroundImage,
+        cover: card.querySelector("img")?.getAttribute("src") ?? null,
+      })),
+      more:
+        Number(
+          tile
+            .querySelector<HTMLElement>(".grid-view-fan-more")
+            ?.textContent?.slice(1),
+        ) || 0,
+    };
+  }
+
+  /** Enter and move over the tile as a pointer would, opening its fan. */
+  hover(item: ItemRef): void {
+    const win = this.grid.ownerDocument.defaultView!;
+    const tile = this.tile(item);
+    tile.dispatchEvent(new win.Event("pointerenter"));
+    tile.dispatchEvent(new win.Event("pointermove"));
   }
 
   /** Scroll the grid to `top`, as the user would. */

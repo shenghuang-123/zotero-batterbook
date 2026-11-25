@@ -74,7 +74,7 @@ export function isPDFAttachment(item: Zotero.Item): boolean {
 }
 
 const diskCacheDirectory = (): string =>
-  PathUtils.join(Zotero.DataDirectory.dir, "coverview", "covers");
+  PathUtils.join(Zotero.DataDirectory.dir, "zetara", "covers");
 
 const diskCacheImagePath = (itemID: number): string =>
   PathUtils.join(diskCacheDirectory(), `${itemID}.png`);

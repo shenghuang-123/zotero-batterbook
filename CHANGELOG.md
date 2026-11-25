@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-11-25
+
+### Added
+
+- hovering a book card fans out the book's attached files; clicking one opens it
+
+### Fixed
+
+- the file fan opens toward the side with room and tightens to stay inside the shelf, instead of being cut off by its edge
+
 ## [0.6.1] - 2026-11-20
 
 ### Added

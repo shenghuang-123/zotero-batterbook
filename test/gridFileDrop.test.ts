@@ -16,6 +16,8 @@ import {
   until,
 } from "./helpers/gridFixture";
 import {
+  imageBytes,
+  inventBook,
   pdfBytes,
   scratchDirectory,
   scratchFile,
@@ -73,11 +75,11 @@ function importsInto(grid: GridFixture, count = 1): Promise<Zotero.Item[]> {
   );
 }
 
-/** Whether an item's data is loaded, which it is not yet while being saved. */
+/** Whether an item's data is loaded and its attachment type is assigned. */
 function isLoaded(item: Zotero.Item): boolean {
   try {
     item.getField("title");
-    return true;
+    return !!item.attachmentContentType;
   } catch {
     return false;
   }
@@ -148,45 +150,127 @@ function geckoTransfer(
   } as unknown as DataTransfer;
 }
 
+/** IDs of items added from now on, for drops outside the shown collection. */
+function addedItems(): number[] {
+  const ids: number[] = [];
+  const observer = Zotero.Notifier.registerObserver(
+    {
+      notify: (event, type, changed) => {
+        if (type === "item" && event === "add")
+          ids.push(...changed.map((id) => Number(id)));
+      },
+    },
+    ["item"],
+    "zetara-file-drop-test",
+  );
+  onTeardown(() => Zotero.Notifier.unregisterObserver(observer));
+  return ids;
+}
+
 describe("grid file drops", function () {
   this.timeout(30000);
 
-  it("imports a file dropped on whitespace as a standalone attachment of the collection", async function () {
+  it("adds a PDF dropped on the empty shelf as a book with its first page attached", async function () {
     const grid = await openFileGrid({ items: 1 });
     const [parent] = grid.items;
-    const path = await scratchFile("standalone.pdf", pdfBytes());
+    const title = inventBook().title;
+    const path = await scratchFile(`${title}.pdf`, pdfBytes());
+
+    assert.isTrue(
+      grid.dragOver("whitespace", grid.fileTransfer([path])).accepted,
+      "hover",
+    );
+    assert.isTrue(
+      grid.grid.classList.contains("file-drop-target"),
+      "the shelf shows where the book will be added",
+    );
+    assert.isTrue(grid.drop("whitespace", grid.fileTransfer([path])), "drop");
+    grid.endDrag();
+    assert.isFalse(grid.grid.classList.contains("file-drop-target"));
+
+    const [book] = await importsInto(grid);
+    assert.isTrue(book.isRegularItem(), "the dropped file becomes a book");
+    assert.equal(book.itemType, "book");
+    assert.equal(book.getField("title"), title);
+    assert.isTrue(
+      Zotero.Collections.get(grid.collection.id)!.hasItem(book),
+      "the book joins the shown collection",
+    );
+    const [attachment] = await attachmentsOf(book);
+    assert.isTrue(
+      attachment.isPDFAttachment(),
+      `the attachment is a PDF, got ${attachment.attachmentContentType}`,
+    );
+    assert.equal(attachment.parentItemID, book.id);
+    assert.isEmpty(parent.getAttachments());
+    assert.isTrue(await IOUtils.exists(path), "copying keeps the source");
+    await grid.settled();
+    await grid.showsItems([book]);
+  });
+
+  it("adds each of several dropped PDFs as its own book", async function () {
+    const grid = await openFileGrid();
+    const titles = [inventBook().title, inventBook().title];
+    const paths = await Promise.all(
+      titles.map((title, index) =>
+        scratchFile(`${title}-${index}.pdf`, pdfBytes()),
+      ),
+    );
+
+    dropAccepted(grid, "whitespace", grid.fileTransfer(paths));
+
+    const books = await importsInto(grid, 2);
+    for (const book of books) await attachmentsOf(book);
+    await until(
+      () => books.every((book) => grid.selectedItems().includes(book.id)),
+      "the imported books to become the native selection",
+      { observe: () => grid.selectedItems() },
+    );
+    await grid.settled();
+    assert.sameMembers(
+      books.map((book) => book.getField("title")),
+      titles.map((title, index) => `${title}-${index}`),
+    );
+    assert.isTrue(books.every((book) => book.itemType === "book"));
+  });
+
+  it("imports a non-book file dropped on whitespace as a standalone attachment of the collection", async function () {
+    const grid = await openFileGrid({ items: 1 });
+    const [parent] = grid.items;
+    const path = await scratchFile(
+      "standalone.png",
+      imageBytes(40, 60, "image/png"),
+    );
 
     dropAccepted(grid, "whitespace", grid.fileTransfer([path]));
 
     const [attachment] = await importsInto(grid);
-    assert.isTrue(attachment.isPDFAttachment());
+    assert.equal(attachment.attachmentContentType, "image/png");
     assert.isNotOk(attachment.parentItemID);
     assert.equal(
       attachment.attachmentLinkMode,
       Zotero.Attachments.LINK_MODE_IMPORTED_FILE,
     );
     assert.isEmpty(parent.getAttachments());
-    await until(
-      () => grid.recognized.includes(attachment.id),
-      "the attachment to be submitted for recognition",
-      { observe: () => grid.recognized },
-    );
     assert.isTrue(await IOUtils.exists(path), "copying keeps the source");
   });
 
-  it("imports a file dropped on whitespace of My Library outside any collection", async function () {
+  it("imports a non-book file dropped on whitespace of My Library outside any collection", async function () {
     const grid = await openFileGrid({ items: 1 });
     const [parent] = grid.items;
     await grid.showRow(`L${Zotero.Libraries.userLibraryID}`, [parent]);
-    const path = await scratchFile("library.pdf", pdfBytes());
+    const path = await scratchFile("library.png", imageBytes(40, 60));
+    const added = addedItems();
 
     dropAccepted(grid, "whitespace", grid.fileTransfer([path]));
 
     const [attachment] = await until(() => {
-      const added = Zotero.Items.get(grid.recognized);
-      return added.length ? track(...added) : undefined;
+      const items = Zotero.Items.get(added).filter(
+        (item) =>
+          item.isAttachment() && item.attachmentContentType === "image/png",
+      );
+      return items.length ? track(...items) : undefined;
     }, "the dropped file to be imported");
-    assert.isTrue(attachment.isPDFAttachment());
     assert.isNotOk(attachment.parentItemID);
     assert.isEmpty(attachment.getCollections());
   });
@@ -296,7 +380,13 @@ describe("grid file drops", function () {
         await until(() => attempted, "the import to be attempted");
         // Once a later drop has been imported, the failed one has finished.
         dropAccepted(grid, target, grid.fileTransfer([later]));
-        await (onTile ? attachmentsOf(parent) : importsInto(grid));
+        if (onTile) {
+          await attachmentsOf(parent);
+        } else {
+          const [book] = await importsInto(grid);
+          await attachmentsOf(book);
+          await grid.settled();
+        }
 
         if (onTile) assert.lengthOf(parent.getAttachments(), 1);
         else assert.lengthOf(imported(grid), 1);
@@ -406,19 +496,19 @@ describe("grid file drops", function () {
   describe("Gecko transfers", function () {
     it("imports a file dragged with a file URL, as from Dolphin", async function () {
       const grid = await openFileGrid();
-      const path = await scratchFile("dolphin.pdf", pdfBytes());
+      const path = await scratchFile("dolphin.png", imageBytes(40, 60));
       const transfer = grid.fileTransfer([path]);
       transfer.mozSetDataAt("text/x-moz-url", `file://${path}`, 0);
 
       dropAccepted(grid, "whitespace", transfer);
 
       const [attachment] = await importsInto(grid);
-      assert.isTrue(attachment.isPDFAttachment());
+      assert.equal(attachment.attachmentContentType, "image/png");
     });
 
     it("imports a file exposed only through a wrapper until queried", async function () {
       const grid = await openFileGrid();
-      const path = await scratchFile("wrapped.pdf", pdfBytes());
+      const path = await scratchFile("wrapped.png", imageBytes(40, 60));
       const file = Zotero.File.pathToFile(path);
       const wrapped: Record<string, unknown> = {
         QueryInterface: () => {
@@ -438,12 +528,12 @@ describe("grid file drops", function () {
       );
 
       const [attachment] = await importsInto(grid);
-      assert.isTrue(attachment.isPDFAttachment());
+      assert.equal(attachment.attachmentContentType, "image/png");
     });
 
     it("accepts a file hidden until the drop", async function () {
       const grid = await openFileGrid();
-      const path = await scratchFile("hidden.pdf", pdfBytes());
+      const path = await scratchFile("hidden.png", imageBytes(40, 60));
       let exposed = false;
       const transfer = geckoTransfer(() => {
         if (!exposed) throw new Error("Files are not exposed while hovering");
@@ -456,7 +546,7 @@ describe("grid file drops", function () {
       grid.endDrag();
 
       const [attachment] = await importsInto(grid);
-      assert.isTrue(attachment.isPDFAttachment());
+      assert.equal(attachment.attachmentContentType, "image/png");
     });
 
     it("imports nothing from a directory, mixed or empty data", async function () {

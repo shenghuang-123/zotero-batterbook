@@ -3,6 +3,10 @@ import { getString } from "../utils/locale";
 import { getPref } from "../utils/prefs";
 import { getItemYear } from "../utils/itemYear";
 import { getTagIndicators, TagIndicator } from "./tagIndicators";
+import {
+  AttachmentIndicator,
+  getAttachmentIndicator,
+} from "./attachmentIndicators";
 import { getPageRow, GridRowGeometry } from "./gridLayout";
 
 // Mount intersecting rows within 400 CSS pixels of either viewport edge.
@@ -13,6 +17,16 @@ import { getPageRow, GridRowGeometry } from "./gridLayout";
 // drop/dragend. Destruction releases both. Selection and menus never pin tiles.
 const TILE_OVERSCAN = 400;
 const RESIZE_GESTURE_PAUSE_MS = 300;
+const MAX_FAN_FILES = 3;
+// Mirror of the fan geometry in coverView.css: every further card shifts by
+// FAN_STEP of the tile width, turns FAN_ANGLE_STEP degrees further and scales
+// to FAN_SCALE, about its bottom centre.
+const FAN_STEP = 0.85;
+const FAN_MIN_STEP = 0.15;
+const FAN_SCALE = 0.96;
+const FAN_BASE_ANGLE = 3;
+const FAN_ANGLE_STEP = 6;
+const FAN_EDGE_MARGIN = 8;
 
 export type GridNavigationCommand =
   "left" | "right" | "up" | "down" | "home" | "end" | "page-up" | "page-down";
@@ -50,6 +64,7 @@ interface GridRenderItem {
   captionTitle: string;
   year: string;
   tags: TagIndicator[];
+  attachments: AttachmentIndicator | undefined;
   iconName: string;
   typeLabel: string;
 }
@@ -173,6 +188,14 @@ export class GridRenderer {
   }
 
   private readonly handleClick = (event: MouseEvent): void => {
+    const fanCard = this.getEventFanCard(event);
+    if (fanCard) {
+      event.preventDefault();
+      event.stopPropagation();
+      const attachmentID = Number(fanCard.dataset.attachmentId);
+      if (Number.isSafeInteger(attachmentID)) this.onActivate?.(attachmentID);
+      return;
+    }
     const itemID = this.getEventItemID(event);
     if (itemID !== undefined) {
       this.host.focus();
@@ -181,9 +204,19 @@ export class GridRenderer {
   };
 
   private readonly handleDoubleClick = (event: Event): void => {
+    if (this.getEventFanCard(event)) return;
     const itemID = this.getEventItemID(event);
     if (itemID !== undefined) this.onActivate?.(itemID);
   };
+
+  private getEventFanCard(event: Event): HTMLElement | undefined {
+    const card = (event.target as Element | null)?.closest(
+      ".grid-view-fan-card",
+    ) as HTMLElement | null;
+    return card && this.host.contains(card) && card.dataset.attachmentId
+      ? card
+      : undefined;
+  }
 
   private getEventItemID(event: Event): number | undefined {
     const entry = (event.target as Element | null)?.closest(
@@ -382,6 +415,8 @@ export class GridRenderer {
           rendered.year === previous.year &&
           rendered.iconName === previous.iconName &&
           rendered.typeLabel === previous.typeLabel &&
+          JSON.stringify(rendered.attachments) ===
+            JSON.stringify(previous.attachments) &&
           JSON.stringify(rendered.tags) === JSON.stringify(previous.tags)
         )
           continue;
@@ -390,6 +425,7 @@ export class GridRenderer {
         if (entry) {
           this.updateCaption(entry, rendered);
           this.updateItemTypeBadge(entry, rendered);
+          this.updateAttachmentFan(entry, rendered);
         }
       }
       this.renderItems = renderItems;
@@ -446,6 +482,7 @@ export class GridRenderer {
       creators: options.showCreators ? item.firstCreator : "",
       year,
       tags: options.showTitles === false ? [] : getTagIndicators(item),
+      attachments: getAttachmentIndicator(item),
       iconName,
       typeLabel: iconName
         ? Zotero.ItemTypes.getLocalizedString(item.itemTypeID)
@@ -481,6 +518,8 @@ export class GridRenderer {
     const replacement = this.buildTile(this.renderItems[index], index);
     oldEntry.replaceWith(replacement);
     this.refreshLayout();
+    this.observeCover(replacement);
+    if (replacement.matches(":hover")) this.loadFanCovers(replacement);
     this.updateActiveDescendant();
   }
 
@@ -551,6 +590,12 @@ export class GridRenderer {
       entry.remove();
     }
     this.updateActiveDescendant();
+    // Resizing and scrolling move the shelf edge under an open fan.
+    for (const entry of this.host.querySelectorAll<HTMLElement>(
+      ".grid-view-item.is-fanned",
+    )) {
+      this.orientFan(entry);
+    }
     // Remember a measurable viewport even outside a resize gesture. Hidden
     // scroll frames may lose their pixel offset before the next reflow.
     this.lastVisibleAnchor =
@@ -643,6 +688,8 @@ export class GridRenderer {
     );
     this.host.insertBefore(entry, next ?? this.spacer);
     this.positionTile(entry, index);
+    this.observeCover(entry);
+    if (entry.matches(":hover")) this.loadFanCovers(entry);
     return entry;
   }
 
@@ -676,14 +723,30 @@ export class GridRenderer {
     image.draggable = false;
     coverFrame.appendChild(image);
 
-    entry.appendChild(coverFrame);
+    const fan = this.doc.createElement("div");
+    fan.className = "grid-view-fan";
+    fan.setAttribute("aria-hidden", "true");
+    const stack = this.doc.createElement("div");
+    stack.className = "grid-view-stack";
+    stack.append(fan, coverFrame);
+    entry.appendChild(stack);
+    entry.addEventListener("pointerenter", () => this.loadFanCovers(entry));
+    entry.addEventListener("pointermove", () => this.fanTile(entry));
+    entry.addEventListener("pointerleave", () =>
+      entry.classList.remove("is-fanned"),
+    );
     this.updateItemTypeBadge(entry, rendered);
     this.updateCaption(entry, rendered);
-    this.pendingCovers.add(entry);
-    this.coverObserver.observe(entry);
+    this.updateAttachmentFan(entry, rendered);
     this.captionObserver.observe(entry);
 
     return entry;
+  }
+
+  /** Observe after layout so the first intersection is not a zero-size tile. */
+  private observeCover(entry: HTMLElement): void {
+    this.pendingCovers.add(entry);
+    this.coverObserver.observe(entry);
   }
 
   private updateItemTypeBadge(
@@ -691,19 +754,175 @@ export class GridRenderer {
     rendered: GridRenderItem,
   ): void {
     entry.querySelector(".grid-view-item-type-badge")?.remove();
-    entry.removeAttribute("aria-description");
     if (!rendered.iconName) return;
     const badge = this.doc.createElement("span");
     badge.className = "grid-view-item-type-badge";
     badge.title = rendered.typeLabel;
     badge.setAttribute("aria-hidden", "true");
+    badge.appendChild(this.createTypeIcon(rendered.iconName));
+    entry.querySelector(".grid-view-cover")!.appendChild(badge);
+  }
+
+  private updateAttachmentFan(
+    entry: HTMLElement,
+    rendered: GridRenderItem,
+  ): void {
+    const fan = entry.querySelector<HTMLElement>(".grid-view-fan")!;
+    fan.replaceChildren();
+    entry.classList.toggle("has-attachments", !!rendered.attachments);
+    if (!rendered.attachments) entry.classList.remove("is-fanned");
+    const description = [
+      rendered.iconName ? rendered.typeLabel : "",
+      rendered.attachments
+        ? getString("book-file-count", {
+            args: { count: rendered.attachments.files.length },
+          })
+        : "",
+    ]
+      .filter(Boolean)
+      .join(" · ");
+    if (description) entry.setAttribute("aria-description", description);
+    else entry.removeAttribute("aria-description");
+    if (!rendered.attachments) return;
+
+    const files = rendered.attachments.files;
+    for (const [index, file] of files.slice(0, MAX_FAN_FILES).entries()) {
+      const card = this.doc.createElement("div");
+      card.className = "grid-view-fan-card";
+      card.dataset.attachmentId = String(file.id);
+      card.style.setProperty("--fan-index", String(index));
+      card.title = file.title;
+      const icon = this.createTypeIcon(file.iconName);
+      icon.classList.add("grid-view-fan-icon");
+      card.appendChild(icon);
+      const image = this.doc.createElement("img");
+      image.alt = file.title;
+      image.draggable = false;
+      image.hidden = true;
+      card.appendChild(image);
+      fan.appendChild(card);
+    }
+    if (files.length > MAX_FAN_FILES) {
+      const rest = files.slice(MAX_FAN_FILES);
+      const more = this.doc.createElement("div");
+      more.className = "grid-view-fan-more";
+      more.style.setProperty("--fan-index", String(MAX_FAN_FILES));
+      more.title = rest.map((file) => file.title).join("\n");
+      more.textContent = `+${rest.length}`;
+      fan.appendChild(more);
+    }
+    if (entry.matches(":hover")) this.loadFanCovers(entry);
+  }
+
+  /** Show the fan only for a real pointer movement, not a stationary cursor. */
+  private fanTile(entry: HTMLElement): void {
+    if (
+      !entry.classList.contains("has-attachments") ||
+      entry.classList.contains("is-fanned")
+    )
+      return;
+    this.loadFanCovers(entry);
+    this.orientFan(entry);
+    entry.classList.add("is-fanned");
+  }
+
+  /**
+   * Open the fan on the roomier side and spread it no wider than the visible
+   * shelf, so no file card is cut off by the shelf edge.
+   */
+  private orientFan(entry: HTMLElement): void {
+    const stack = entry.querySelector<HTMLElement>(".grid-view-stack");
+    const cards = entry.querySelectorAll<HTMLElement>(
+      ".grid-view-fan-card, .grid-view-fan-more",
+    );
+    if (!stack || !cards.length) return;
+    const bounds = stack.getBoundingClientRect();
+    const { width, height } = bounds;
+    if (!width) return;
+    const outerIndex =
+      Number(cards[cards.length - 1].style.getPropertyValue("--fan-index")) ||
+      0;
+    const positions = outerIndex + 1;
+    const radians =
+      ((FAN_BASE_ANGLE + outerIndex * FAN_ANGLE_STEP) * Math.PI) / 180;
+    // The outermost card turns about its bottom centre; its far top corner
+    // leans past the tile's side edge by this much.
+    const overhang =
+      FAN_SCALE *
+        ((width / 2) * Math.cos(radians) + height * Math.sin(radians)) -
+      width / 2;
+    const required = FAN_STEP * width * positions + overhang + FAN_EDGE_MARGIN;
+
+    const viewport = this.host.getBoundingClientRect();
+    const visibleLeft = viewport.left + this.host.clientLeft;
+    const roomLeft = bounds.left - visibleLeft;
+    const roomRight = visibleLeft + this.host.clientWidth - bounds.right;
+    const direction: 1 | -1 =
+      roomRight >= required || roomRight >= roomLeft ? 1 : -1;
+    const room = direction === 1 ? roomRight : roomLeft;
+    const step =
+      positions === 1 || room >= required
+        ? FAN_STEP
+        : Math.max(
+            FAN_MIN_STEP,
+            Math.min(
+              FAN_STEP,
+              (room - overhang - FAN_EDGE_MARGIN) / (positions * width),
+            ),
+          );
+    // Scrolling re-runs this often; only touch the style when it changes.
+    const stepValue = `${(step * 100).toFixed(2)}%`;
+    if (entry.style.getPropertyValue("--fan-direction") !== String(direction))
+      entry.style.setProperty("--fan-direction", String(direction));
+    if (entry.style.getPropertyValue("--fan-step") !== stepValue)
+      entry.style.setProperty("--fan-step", stepValue);
+  }
+
+  private loadFanCovers(entry: HTMLElement): void {
+    for (const card of entry.querySelectorAll<HTMLElement>(
+      ".grid-view-fan-card",
+    )) {
+      if (card.dataset.coverLoaded) continue;
+      card.dataset.coverLoaded = "true";
+      const attachment = Zotero.Items.get(Number(card.dataset.attachmentId));
+      if (attachment) void this.loadFanCover(entry, card, attachment);
+    }
+  }
+
+  private async loadFanCover(
+    entry: HTMLElement,
+    card: HTMLElement,
+    attachment: Zotero.Item,
+  ): Promise<void> {
+    const renderVersion = this.renderVersion;
+    CoverProvider.cacheCover(attachment);
+    const cover = await CoverProvider.getCoverResult(attachment.id);
+    if (
+      !cover ||
+      renderVersion !== this.renderVersion ||
+      !this.host.contains(entry) ||
+      !card.isConnected
+    )
+      return;
+    const image = card.querySelector("img");
+    if (!image) return;
+    image.addEventListener(
+      "load",
+      () => {
+        if (renderVersion === this.renderVersion && this.host.contains(entry))
+          image.hidden = false;
+      },
+      { once: true },
+    );
+    image.src = cover.uri;
+  }
+
+  private createTypeIcon(iconName: string): HTMLElement {
     // Use the same CSS icon and variant name as Zotero's native item tree.
     const icon = this.doc.createElement("span");
     icon.className = "icon icon-css icon-item-type";
-    icon.dataset.itemType = rendered.iconName;
-    badge.appendChild(icon);
-    entry.querySelector(".grid-view-cover")!.appendChild(badge);
-    entry.setAttribute("aria-description", rendered.typeLabel);
+    icon.dataset.itemType = iconName;
+    return icon;
   }
 
   private updateCaption(entry: HTMLElement, rendered: GridRenderItem): void {
@@ -840,7 +1059,7 @@ export class GridRenderer {
       return false;
     }
 
-    const image = entry.querySelector("img");
+    const image = entry.querySelector<HTMLImageElement>(".grid-view-cover img");
     if (!image) return false;
     image.addEventListener(
       "load",

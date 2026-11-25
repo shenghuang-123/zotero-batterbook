@@ -3,6 +3,7 @@ import {
   createItems,
   focusWindow,
   GridFixture,
+  localized,
   onTeardown,
   openGrid,
   painted,
@@ -117,10 +118,15 @@ describe("Item Pane cover", function () {
     const attachment = await attachCover(grid, item);
     await grid.select([item]);
     await paneShows(grid, showsAttachment(attachment), "the cover");
+    const heading = localized("item-pane-cover", { attribute: "label" });
+    const tooltip = localized("item-pane-cover", { attribute: "tooltiptext" });
     const section = coverSection(grid.win)!;
     await until(
-      () => section.querySelector(".head .title")?.textContent === "Cover",
+      () => section.querySelector(".head .title")?.textContent === heading,
       "the section heading to read Cover",
+      {
+        observe: () => section.querySelector(".head .title")?.textContent,
+      },
     );
     const button = () =>
       Array.from(
@@ -129,7 +135,7 @@ describe("Item Pane cover", function () {
         ),
       ).find((candidate) => candidate.dataset.pane === section.dataset.pane);
     await until(
-      () => button()?.getAttribute("tooltiptext") === "Cover",
+      () => button()?.getAttribute("tooltiptext") === tooltip,
       "the sidenav button's tooltip to read Cover",
       { observe: () => button()?.getAttribute("tooltiptext") },
     );

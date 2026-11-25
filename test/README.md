@@ -2,13 +2,13 @@
 
 Tests run inside Zotero (`npm test -- --no-watch`), one file after another in
 alphabetical order, in one Zotero session. Every test must pass alone and in any
-order. To run some files only, point `COVER_VIEW_TEST_ENTRIES` at a directory
+order. To run some files only, point `ZETARA_TEST_ENTRIES` at a directory
 holding them (symlinks work):
 
 ```sh
-mkdir -p /tmp/cover-view-entries
-ln -s "$PWD/test/gridSelection.test.ts" /tmp/cover-view-entries/
-COVER_VIEW_TEST_ENTRIES=/tmp/cover-view-entries npm test -- --no-watch
+mkdir -p /tmp/zetara-entries
+ln -s "$PWD/test/gridSelection.test.ts" /tmp/zetara-entries/
+ZETARA_TEST_ENTRIES=/tmp/zetara-entries npm test -- --no-watch
 ```
 
 Organise test files by user-visible behaviour, named with `CONTEXT.md` terms
@@ -57,7 +57,7 @@ as the viewport anchor across many layout changes.
 ## Test environment (`test/helpers/testEnvironment.ts`)
 
 - `scratchDirectory`/`scratchFile`: files under a per-run
-  `zotero-cover-view-*` directory in the OS temp directory, removed after the run;
+  `zotero-zetara-*` directory in the OS temp directory, removed after the run;
 - `imageBytes`, `pdfBytes`, `epubBytes`: generated PNG/JPEG images, minimal
   PDFs (optionally with custom page contents, objects and further pages) and
   real EPUB archives;
