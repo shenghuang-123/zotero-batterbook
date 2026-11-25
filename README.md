@@ -1,11 +1,11 @@
-# Zetara
+# Batterbook
 
 [![zotero target version](https://img.shields.io/badge/Zotero-10-green?style=flat-square&logo=zotero&logoColor=CC2936)](https://www.zotero.org)
 
-Zetara is a [Zotero](https://www.zotero.org) extension for storing, managing
-and reading PDF books, including files of a thousand pages or more. It shows
-books as a bookshelf of vertical cover cards and leaves reading to Zotero's own
-reader.
+Batterbook is a [Zotero](https://www.zotero.org) extension for storing,
+managing and reading PDF books, including files of a thousand pages or more. It
+shows books as a bookshelf of vertical cover cards and leaves reading to
+Zotero's own reader.
 
 ## Features
 
@@ -35,7 +35,7 @@ reader.
   - attach further editions later from the **Book files** item pane section
   - open or rename each attachment there
 - **Works alongside other plugins**
-  - styles are scoped to Zetara's own views
+  - styles are scoped to Batterbook's own views
   - Ethereal Style's list-view columns, item pane sections and native reader
     behaviour are left untouched
   - opening the bookshelf closes Ethereal Style's gallery overlay so the two

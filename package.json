@@ -1,8 +1,8 @@
 {
-  "name": "zetara",
+  "name": "batterbook",
   "type": "module",
   "version": "1.1.0",
-  "description": "A vertical PDF-cover bookshelf for Zotero with native reading and multiple attachments.",
+  "description": "Batterbook: a vertical PDF-cover bookshelf for Zotero with native reading and multiple attachments.",
   "config": {
     "addonName": "Zetara",
     "addonID": "zetara@zotero-plugin.local",
@@ -10,11 +10,11 @@
     "addonInstance": "Zetara",
     "prefsPrefix": "extensions.zotero.zetara"
   },
-  "author": "Zetara contributors; based on Cover View by Paul Luis Röhl",
+  "author": "Batterbook contributors; based on Cover View by Paul Luis Röhl",
   "license": "AGPL-3.0-or-later",
   "repository": {
     "type": "git",
-    "url": "https://github.com/paulluis-roehl/zotero-cover-view.git"
+    "url": "https://github.com/shenghuang-123/zotero-batterbook.git"
   },
   "scripts": {
     "start": "zotero-plugin serve",
